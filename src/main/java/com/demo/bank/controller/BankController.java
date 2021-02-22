@@ -3,7 +3,10 @@ package com.demo.bank.controller;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
+import javax.validation.Valid;
+
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
@@ -12,9 +15,9 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.demo.bank.configuration.Configuration;
 import com.demo.bank.constants.BankAccountConstants;
 import com.demo.bank.constants.URIConstants;
 import com.demo.bank.exception.ParameterRequired;
@@ -31,31 +34,40 @@ public class BankController {
 	private BankAccountService bankService;
 	@Autowired
 	private BankAccountValidation bankValidation;
+	@Autowired
+	private Configuration configuration;
+	
+	
+	@GetMapping("/api/v1/message")
+	public String message() {
+		return configuration.getMessage();
+	}
 	
 	@PostMapping(value = URIConstants.CREATE_BANKACCOUNT,
 			produces = {"application/json","application/xml"},
 			consumes = {"application/json","application/xml"})
-	public ResponseEntity<BankResponse> createBankAccount(@RequestBody @Validated BankAccount account) {
-		
+	public ResponseEntity<BankResponse> createBankAccount(@RequestBody @Valid BankAccount account) {
 		bankValidation.validateIfAccountExists(account.getAccountNumber());
 		bankService.createBankAccount(account);
 		return new ResponseEntity<BankResponse>(BankResponse.builder().id(account.getAccountId())
 					.statusCode(BankAccountConstants.SUCCESS_STATUS)
 					.timeStamp(LocalDateTime.now())
 					.message(URIConstants.CREATE_BANKACCOUNT_MESSAGE).build(), HttpStatus.CREATED);
-		
-	}
+		}
 	
-	@PutMapping(URIConstants.UPDATE_BANKACCOUNT)
-	public ResponseEntity<BankResponse> updateBankAccount(@Validated BankAccount account, @PathVariable("id") Long id){
+	
+	@PutMapping(value = URIConstants.UPDATE_BANKACCOUNT,
+			produces = {"application/json","application/xml"},
+			consumes = {"application/json","application/xml"})
+	public ResponseEntity<BankResponse> updateBankAccount(@Valid BankAccount account, @PathVariable("id") Long id){
 		bankValidation.validateBankAccountId(id);
 		bankService.updateBankAccount(account);
 		return new ResponseEntity<BankResponse>(BankResponse.builder().id(account.getAccountId())
 				.statusCode(BankAccountConstants.SUCCESS_STATUS)
 				.timeStamp(LocalDateTime.now())
-				.message(URIConstants.UPDATE_BANKACCOUNT_MESSAGE).build(), HttpStatus.OK);
-		
+				.message(URIConstants.UPDATE_BANKACCOUNT_MESSAGE).build(), HttpStatus.OK);	
 	}
+	
 	
 	@GetMapping(URIConstants.GET_BANKACCOUNT)
 	public BankAccount getBankAccount(@PathVariable("id") Long id) {
@@ -64,23 +76,26 @@ public class BankController {
 			return account.get();
 		else
 			throw new ParameterRequired("BankAccount id : "+id+" is invalid");
-		
 	}
 	
-	@PostMapping(URIConstants.DEPOSIT_AMOUNT)
-	public ResponseEntity<BankResponse> depositAmount(@RequestBody @Validated Amount amount, @PathVariable("id") Long id){
+	
+	@PostMapping(value = URIConstants.DEPOSIT_AMOUNT,
+			produces = {"application/json","application/xml"},
+			consumes = {"application/json","application/xml"})
+	public ResponseEntity<BankResponse> depositAmount(@RequestBody @Valid Amount amount, @PathVariable("id") Long id){
 		BankAccount account = bankValidation.validateAndGetBankAccountById(id);
-		Double total = amount.getAmount() + account.getAmount();
-		account.setAmount(total);
-		bankService.updateBankAccount(account);
+		bankService.depositAmount(account,amount);
 		return new ResponseEntity<BankResponse>(BankResponse.builder().id(account.getAccountId())
 				.statusCode(BankAccountConstants.SUCCESS_STATUS)
 				.timeStamp(LocalDateTime.now())
 				.message(URIConstants.DEPOSIT_BANKACCOUNT_MESSAGE).build(), HttpStatus.OK);
 	}
 	
-	@PostMapping(URIConstants.WITHDRAW_AMOUNT)
-	public ResponseEntity<BankResponse> withdrawAmount(@RequestBody @Validated Amount amount, @PathVariable("id") Long id){
+	
+	@PostMapping(value = URIConstants.WITHDRAW_AMOUNT,
+			produces = {"application/json","application/xml"},
+			consumes = {"application/json","application/xml"})
+	public ResponseEntity<BankResponse> withdrawAmount(@RequestBody @Valid Amount amount, @PathVariable("id") Long id){
 		BankAccount account = bankValidation.validateAndGetBankAccountById(id);
 		if(amount.getAmount() > account.getAmount())
 			throw new ParameterRequired("Withdraw amount must be less than account balance");
